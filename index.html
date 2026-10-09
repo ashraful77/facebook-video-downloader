@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1877f2">
+  <meta name="description" content="A simple tool to check Facebook video links and directly accessible video files.">
+  <title>Facebook Video Downloader</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="page">
+    <section class="card" aria-labelledby="page-title">
+      <div class="brand-icon" aria-hidden="true">▶</div>
+      <p class="eyebrow">FREE · SIMPLE · NO SIGN-UP</p>
+      <h1 id="page-title">Facebook Video <span>Downloader</span></h1>
+      <p class="intro">Paste a public Facebook video link to check whether a direct video file is available.</p>
+
+      <form id="link-form" novalidate>
+        <label for="video-url">Facebook video link</label>
+        <div class="input-wrap">
+          <input id="video-url" name="video-url" type="url" inputmode="url"
+            placeholder="https://www.facebook.com/…" autocomplete="url" required>
+          <button class="paste-button" id="paste-button" type="button" aria-label="Paste link">Paste</button>
+        </div>
+        <button class="primary-button" type="submit">Check Link <span aria-hidden="true">→</span></button>
+      </form>
+
+      <div id="result" class="result" role="status" aria-live="polite" hidden></div>
+
+      <div class="notice">
+        <strong>Important</strong>
+        <p>This free static website cannot extract a video file from an ordinary Facebook page link. It can only offer a download for a directly accessible video file. It does not access private videos or bypass Facebook restrictions.</p>
+      </div>
+      <footer>Made to be simple · Works on phone and computer</footer>
+    </section>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
