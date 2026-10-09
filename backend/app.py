@@ -60,12 +60,19 @@ def format_quality_options(data):
     return options
 
 def format_for_quality(quality):
-    if quality == "best":
-        return "best[ext=mp4]/best"
     if quality not in ALLOWED_QUALITIES:
         raise ValueError("Choose one of the available quality options.")
+    if quality == "best":
+        # Facebook often exposes a single progressive format rather than
+        # separate height-labelled formats. Do not require MP4 specifically.
+        return "best"
     height = int(quality)
-    return f"best[height<={height}][ext=mp4]/best[height<={height}]"
+    # Prefer a combined audio/video stream at or below the chosen height.
+    # Fall back to any combined format if Facebook does not expose height
+    # metadata for its formats; never require MP4 when it is unavailable.
+    return (
+        f"best[height<={height}]/best[height<=?{height}]/best"
+    )
 
 @app.get("/api/health")
 def health():
