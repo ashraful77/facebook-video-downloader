@@ -14,7 +14,7 @@ function isFacebookHost(hostname) {
   return facebookHosts.has(host) || host.endsWith(".facebook.com") || host === "fb.watch" || host.endsWith(".fb.watch");
 }
 
-function showResult(title, message, link) {
+function showResult(title, message) {
   result.replaceChildren();
   result.hidden = false;
   const heading = document.createElement("strong");
@@ -22,17 +22,14 @@ function showResult(title, message, link) {
   const paragraph = document.createElement("p");
   paragraph.textContent = message;
   result.append(heading, paragraph);
-  if (link) {
-    const anchor = document.createElement("a");
-    anchor.className = "action-link";
-    anchor.href = link.href;
-    anchor.textContent = link.text;
-    if (link.external) {
-      anchor.target = "_blank";
-      anchor.rel = "noopener noreferrer";
-    }
-    result.append(anchor);
-  }
+}
+
+function addMessage(message, className = "result-message") {
+  const paragraph = document.createElement("p");
+  paragraph.className = className;
+  paragraph.textContent = message;
+  result.append(paragraph);
+  return paragraph;
 }
 
 pasteButton.addEventListener("click", async () => {
@@ -50,17 +47,23 @@ pasteButton.addEventListener("click", async () => {
   }
 });
 
-async function callApi(path, url) {
+async function callApi(path, body) {
   const response = await fetch(`${API_BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url })
+    body: JSON.stringify(body)
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.ok) {
     throw new Error(data.error || "The service could not process this link. Please try again.");
   }
   return data;
+}
+
+function formatDuration(seconds) {
+  if (!Number.isFinite(Number(seconds))) return "";
+  const value = Math.max(0, Math.floor(Number(seconds)));
+  return `${Math.floor(value / 60)}:${String(value % 60).padStart(2, "0")}`;
 }
 
 form.addEventListener("submit", async (event) => {
@@ -78,36 +81,69 @@ form.addEventListener("submit", async (event) => {
     return;
   }
 
-  showResult("Checking video…", "Connecting to the free backend. The first request may take a little longer if the service was sleeping.");
+  showResult("Checking video…", "Connecting to the free backend. The first request after inactivity may take about a minute.");
   const submitButton = form.querySelector('button[type="submit"]');
   submitButton.disabled = true;
-  submitButton.textContent = "Please wait…";
+  submitButton.textContent = "Checking…";
 
   try {
-    const data = await callApi("/api/info", url.href);
+    const data = await callApi("/api/info", { url: url.href });
     result.replaceChildren();
     result.hidden = false;
+
     const heading = document.createElement("strong");
     heading.textContent = "Video found";
-    const paragraph = document.createElement("p");
-    paragraph.textContent = data.title || "Facebook video";
-    result.append(heading, paragraph);
+    const title = document.createElement("p");
+    title.className = "video-title";
+    title.textContent = data.title || "Facebook video";
+    result.append(heading, title);
+
+    if (data.duration) {
+      addMessage(`Duration: ${formatDuration(data.duration)}`, "video-meta");
+    }
+
+    const qualityLabel = document.createElement("label");
+    qualityLabel.className = "quality-label";
+    qualityLabel.htmlFor = "quality-select";
+    qualityLabel.textContent = "Download quality";
+    const qualitySelect = document.createElement("select");
+    qualitySelect.id = "quality-select";
+    qualitySelect.className = "quality-select";
+
+    const qualities = Array.isArray(data.qualities) && data.qualities.length
+      ? data.qualities
+      : [{ value: "best", label: "Best available quality" }];
+    qualities.forEach((quality) => {
+      const option = document.createElement("option");
+      option.value = String(quality.value);
+      option.textContent = quality.label;
+      qualitySelect.append(option);
+    });
+    result.append(qualityLabel, qualitySelect);
 
     const downloadButton = document.createElement("button");
-    downloadButton.className = "primary-button";
+    downloadButton.className = "primary-button download-button";
     downloadButton.type = "button";
     downloadButton.textContent = "Download Video";
+    result.append(downloadButton);
+
+    const status = document.createElement("p");
+    status.className = "download-status";
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+    result.append(status);
+
     downloadButton.addEventListener("click", async () => {
       downloadButton.disabled = true;
+      qualitySelect.disabled = true;
       downloadButton.textContent = "Preparing download…";
-      const note = document.createElement("p");
-      note.textContent = "Please keep this page open while the video is prepared.";
-      result.append(note);
+      status.textContent = "Preparing the selected quality. Keep this page open; larger videos may take a while.";
+      status.classList.remove("error-text", "success-text");
       try {
         const response = await fetch(`${API_BASE}/api/download`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: url.href })
+          body: JSON.stringify({ url: url.href, quality: qualitySelect.value })
         });
         const contentType = response.headers.get("content-type") || "";
         if (!response.ok || contentType.includes("application/json")) {
@@ -115,6 +151,7 @@ form.addEventListener("submit", async (event) => {
           throw new Error(errorData.error || "The video could not be downloaded.");
         }
         const blob = await response.blob();
+        if (!blob.size) throw new Error("The server returned an empty file. Please try another quality.");
         const objectUrl = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = objectUrl;
@@ -123,20 +160,17 @@ form.addEventListener("submit", async (event) => {
         a.click();
         a.remove();
         setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
-        note.textContent = "Download started. Check your browser's Downloads folder.";
+        status.textContent = "Download started! Check your browser's Downloads folder.";
+        status.classList.add("success-text");
       } catch (error) {
-        note.textContent = error.message || "Download failed. Try another public video link.";
+        status.textContent = error.message || "Download failed. Try another public video.";
+        status.classList.add("error-text");
       } finally {
         downloadButton.disabled = false;
+        qualitySelect.disabled = false;
         downloadButton.textContent = "Download Video";
       }
     });
-    result.append(downloadButton);
-    if (data.duration) {
-      const duration = document.createElement("p");
-      duration.textContent = `Duration: ${Math.floor(data.duration / 60)}:${String(Math.floor(data.duration % 60)).padStart(2, "0")}`;
-      result.append(duration);
-    }
   } catch (error) {
     showResult("Could not process this video", error.message || "This link may be private, unavailable, or unsupported. Please try a public video you are authorized to download.");
   } finally {
