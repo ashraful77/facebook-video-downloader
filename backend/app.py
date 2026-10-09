@@ -53,8 +53,10 @@ def format_quality_options(data):
         if item.get("height") and item.get("vcodec") != "none"
     }
     options = [{"value": "best", "label": "Best available quality"}]
+    # Only offer a cap when the extractor reports at least one video format
+    # at or below that resolution. Otherwise yt-dlp may have nothing to select.
     for height in (1080, 720, 480, 360):
-        if any(h >= height for h in heights):
+        if any(h <= height for h in heights):
             options.append({"value": str(height), "label": f"Up to {height}p"})
     return options
 
@@ -146,7 +148,7 @@ def download():
             except OSError:
                 pass
         return jsonify({"ok": False, "error": str(exc)}), 400
-    except Exception:
+    except Exception as exc:
         if temp_dir:
             try:
                 for item in Path(temp_dir).glob("*"):
@@ -154,9 +156,11 @@ def download():
                 Path(temp_dir).rmdir()
             except OSError:
                 pass
+        # Return a concise extractor message to help diagnose real failures.
+        detail = " ".join(str(exc).split())[:240]
         return jsonify({
             "ok": False,
-            "error": "Download failed. This link may be private, unavailable, too large, or not supported by the current extractor. Try another public video."
+            "error": f"Download failed: {detail or 'The video extractor could not process this link.'}"
         }), 422
 
 if __name__ == "__main__":
