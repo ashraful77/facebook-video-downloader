@@ -53,11 +53,10 @@ def format_quality_options(data):
         if item.get("height") and item.get("vcodec") != "none"
     }
     options = [{"value": "best", "label": "Best available quality"}]
-    # Only offer a cap when the extractor reports at least one video format
-    # at or below that resolution. Otherwise yt-dlp may have nothing to select.
+    # Show standard quality choices consistently. If a format is missing,
+    # yt-dlp will use the best format at or below the requested cap.
     for height in (1080, 720, 480, 360):
-        if any(h <= height for h in heights):
-            options.append({"value": str(height), "label": f"Up to {height}p"})
+        options.append({"value": str(height), "label": f"Up to {height}p"})
     return options
 
 def format_for_quality(quality):
