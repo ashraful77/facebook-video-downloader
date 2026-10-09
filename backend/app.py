@@ -18,7 +18,7 @@ CORS(app, resources={r"/api/*": {"origins": [
 MAX_FILE_BYTES = 250 * 1024 * 1024
 ALLOWED_HOSTS = {"facebook.com", "www.facebook.com", "m.facebook.com",
                  "web.facebook.com", "fb.watch", "www.fb.watch"}
-ALLOWED_QUALITIES = {"best", "720", "480", "360"}
+ALLOWED_QUALITIES = {"best", "1080", "720", "480", "360"}
 
 def validate_facebook_url(value):
     if not isinstance(value, str) or len(value) > 2048:
@@ -64,7 +64,7 @@ def format_for_quality(quality):
     if quality not in ALLOWED_QUALITIES:
         raise ValueError("Choose one of the available quality options.")
     height = int(quality)
-    return f"best[height<={height}][ext=mp4]/best[height<={height}]/best"
+    return f"best[height<={height}][ext=mp4]/best[height<={height}]"
 
 @app.get("/api/health")
 def health():
