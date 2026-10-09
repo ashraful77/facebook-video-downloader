@@ -162,3 +162,39 @@ form.addEventListener("submit", async (event) => {
     submitButton.innerHTML = 'Check Link <span aria-hidden="true">→</span>';
   }
 });
+
+
+const shareButton = document.querySelector("#share-button");
+const shareStatus = document.querySelector("#share-status");
+
+shareButton.addEventListener("click", async () => {
+  const shareData = {
+    title: "Facebook Video Downloader",
+    text: "Download publicly accessible Facebook videos with this free tool.",
+    url: window.location.href
+  };
+
+  shareStatus.hidden = false;
+  shareStatus.textContent = "";
+
+  if (navigator.share) {
+    try {
+      await navigator.share(shareData);
+      shareStatus.textContent = "Thanks for sharing!";
+    } catch (error) {
+      if (error && error.name !== "AbortError") {
+        shareStatus.textContent = "Sharing isn't available here. You can copy the website address from your browser.";
+      } else {
+        shareStatus.hidden = true;
+      }
+    }
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(window.location.href);
+    shareStatus.textContent = "Website link copied. You can now share it with friends.";
+  } catch {
+    shareStatus.textContent = "Copy this website address from your browser to share it with friends.";
+  }
+});
