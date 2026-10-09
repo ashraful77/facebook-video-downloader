@@ -18,6 +18,7 @@ CORS(app, resources={r"/api/*": {"origins": [
 MAX_FILE_BYTES = 250 * 1024 * 1024
 ALLOWED_HOSTS = {"facebook.com", "www.facebook.com", "m.facebook.com",
                  "web.facebook.com", "fb.watch", "www.fb.watch"}
+ALLOWED_QUALITIES = {"best", "720", "480", "360"}
 
 def validate_facebook_url(value):
     if not isinstance(value, str) or len(value) > 2048:
@@ -45,6 +46,26 @@ def ydl_options():
         "format": "best[ext=mp4]/best",
     }
 
+def format_quality_options(data):
+    heights = {
+        int(item["height"])
+        for item in (data.get("formats") or [])
+        if item.get("height") and item.get("vcodec") != "none"
+    }
+    options = [{"value": "best", "label": "Best available quality"}]
+    for height in (1080, 720, 480, 360):
+        if any(h >= height for h in heights):
+            options.append({"value": str(height), "label": f"Up to {height}p"})
+    return options
+
+def format_for_quality(quality):
+    if quality == "best":
+        return "best[ext=mp4]/best"
+    if quality not in ALLOWED_QUALITIES:
+        raise ValueError("Choose one of the available quality options.")
+    height = int(quality)
+    return f"best[height<={height}][ext=mp4]/best[height<={height}]/best"
+
 @app.get("/api/health")
 def health():
     return jsonify({"ok": True, "service": "Facebook Video Downloader API"})
@@ -62,7 +83,7 @@ def info():
             "ok": True,
             "title": str(data.get("title") or "Facebook video")[:180],
             "duration": data.get("duration"),
-            "thumbnail": data.get("thumbnail"),
+            "qualities": format_quality_options(data),
         })
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
@@ -75,17 +96,19 @@ def info():
 @app.post("/api/download")
 def download():
     body = request.get_json(silent=True) or {}
+    temp_dir = None
     try:
         url = validate_facebook_url(body.get("url", ""))
+        quality = str(body.get("quality", "best"))
+        selected_format = format_for_quality(quality)
         temp_dir = tempfile.mkdtemp(prefix="fb-video-")
         output_template = str(Path(temp_dir) / "%(id)s.%(ext)s")
         options = ydl_options()
-        options.update({"outtmpl": output_template, "format": "best[ext=mp4]/best"})
+        options.update({"outtmpl": output_template, "format": selected_format})
         with yt_dlp.YoutubeDL(options) as ydl:
             info_data = ydl.extract_info(url, download=True)
             filename = Path(ydl.prepare_filename(info_data))
         if not filename.exists():
-            # Some formats can have a different extension after merging.
             candidates = list(Path(temp_dir).glob("*"))
             if not candidates:
                 raise RuntimeError("The video file was not created.")
@@ -99,9 +122,10 @@ def download():
         @after_this_request
         def cleanup(response):
             try:
-                for item in Path(temp_dir).glob("*"):
-                    item.unlink(missing_ok=True)
-                Path(temp_dir).rmdir()
+                if temp_dir:
+                    for item in Path(temp_dir).glob("*"):
+                        item.unlink(missing_ok=True)
+                    Path(temp_dir).rmdir()
             except OSError:
                 pass
             return response
@@ -114,11 +138,25 @@ def download():
             conditional=True,
         )
     except ValueError as exc:
+        if temp_dir:
+            try:
+                for item in Path(temp_dir).glob("*"):
+                    item.unlink(missing_ok=True)
+                Path(temp_dir).rmdir()
+            except OSError:
+                pass
         return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception:
+        if temp_dir:
+            try:
+                for item in Path(temp_dir).glob("*"):
+                    item.unlink(missing_ok=True)
+                Path(temp_dir).rmdir()
+            except OSError:
+                pass
         return jsonify({
             "ok": False,
-            "error": "Download failed. This link may be private, unavailable, too large, or not supported by the current extractor."
+            "error": "Download failed. This link may be private, unavailable, too large, or not supported by the current extractor. Try another public video."
         }), 422
 
 if __name__ == "__main__":
