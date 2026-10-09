@@ -102,24 +102,10 @@ form.addEventListener("submit", async (event) => {
       addMessage(`Duration: ${formatDuration(data.duration)}`, "video-meta");
     }
 
-    const qualityLabel = document.createElement("label");
-    qualityLabel.className = "quality-label";
-    qualityLabel.htmlFor = "quality-select";
-    qualityLabel.textContent = "Download quality";
-    const qualitySelect = document.createElement("select");
-    qualitySelect.id = "quality-select";
-    qualitySelect.className = "quality-select";
-
-    const qualities = Array.isArray(data.qualities) && data.qualities.length
-      ? data.qualities
-      : [{ value: "best", label: "Best available quality" }];
-    qualities.forEach((quality) => {
-      const option = document.createElement("option");
-      option.value = String(quality.value);
-      option.textContent = quality.label;
-      qualitySelect.append(option);
-    });
-    result.append(qualityLabel, qualitySelect);
+    const qualityNote = document.createElement("p");
+    qualityNote.className = "video-meta";
+    qualityNote.textContent = "Quality: Best available (original source quality)";
+    result.append(qualityNote);
 
     const downloadButton = document.createElement("button");
     downloadButton.className = "primary-button download-button";
@@ -135,15 +121,14 @@ form.addEventListener("submit", async (event) => {
 
     downloadButton.addEventListener("click", async () => {
       downloadButton.disabled = true;
-      qualitySelect.disabled = true;
       downloadButton.textContent = "Preparing download…";
-      status.textContent = "Preparing the selected quality. Keep this page open; larger videos may take a while.";
+      status.textContent = "Preparing the best available quality. Keep this page open; larger videos may take a while.";
       status.classList.remove("error-text", "success-text");
       try {
         const response = await fetch(`${API_BASE}/api/download`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: url.href, quality: qualitySelect.value })
+          body: JSON.stringify({ url: url.href, quality: "best" })
         });
         const contentType = response.headers.get("content-type") || "";
         if (!response.ok || contentType.includes("application/json")) {
@@ -151,7 +136,7 @@ form.addEventListener("submit", async (event) => {
           throw new Error(errorData.error || "The video could not be downloaded.");
         }
         const blob = await response.blob();
-        if (!blob.size) throw new Error("The server returned an empty file. Please try another quality.");
+        if (!blob.size) throw new Error("The server returned an empty file. Please try again.");
         const objectUrl = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = objectUrl;
@@ -167,8 +152,7 @@ form.addEventListener("submit", async (event) => {
         status.classList.add("error-text");
       } finally {
         downloadButton.disabled = false;
-        qualitySelect.disabled = false;
-        downloadButton.textContent = "Download Video";
+          downloadButton.textContent = "Download Video";
       }
     });
   } catch (error) {
