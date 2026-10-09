@@ -47,15 +47,44 @@ pasteButton.addEventListener("click", async () => {
   }
 });
 
+function friendlyErrorMessage(error, stage = "check") {
+  const message = String(error?.message || error || "").trim();
+  const lower = message.toLowerCase();
+
+  if (/failed to fetch|networkerror|network request failed|load failed/.test(lower)) {
+    return "The free server may be waking up or temporarily unavailable. Wait 30–60 seconds, then try again.";
+  }
+  if (/private|restricted|age-restricted|login|required|unavailable|unsupported|not found/.test(lower)) {
+    return "This video may be private, restricted, removed, or unsupported. Try a public Facebook video link you have permission to download.";
+  }
+  if (/250\s?mb|larger than/.test(lower)) {
+    return "This video is over the 250 MB limit. Please try a smaller video.";
+  }
+  if (/timed out|timeout|socket/.test(lower)) {
+    return "The request took too long. Try again in a moment, or use a shorter video.";
+  }
+  if (stage === "download") {
+    return message && !/^download failed:/i.test(message)
+      ? message
+      : "The video could not be downloaded right now. Please try again in a moment.";
+  }
+  return message || "Could not check this video. Please try a public Facebook video link.";
+}
+
 async function callApi(path, body) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+  } catch (error) {
+    throw new Error(friendlyErrorMessage(error, "check"));
+  }
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data.ok) {
-    throw new Error(data.error || "The service could not process this link. Please try again.");
+    throw new Error(friendlyErrorMessage(data.error || "The service could not process this link.", "check"));
   }
   return data;
 }
@@ -148,7 +177,7 @@ form.addEventListener("submit", async (event) => {
         status.textContent = "Download started! Check your browser's Downloads folder.";
         status.classList.add("success-text");
       } catch (error) {
-        status.textContent = error.message || "Download failed. Try another public video.";
+        status.textContent = friendlyErrorMessage(error, "download");
         status.classList.add("error-text");
       } finally {
         downloadButton.disabled = false;
@@ -156,7 +185,7 @@ form.addEventListener("submit", async (event) => {
       }
     });
   } catch (error) {
-    showResult("Could not process this video", error.message || "This link may be private, unavailable, or unsupported. Please try a public video you are authorized to download.");
+    showResult("Could not process this video", friendlyErrorMessage(error, "check"));
   } finally {
     submitButton.disabled = false;
     submitButton.innerHTML = 'Check Link <span aria-hidden="true">→</span>';
