@@ -90,3 +90,22 @@ footer { margin-top: 24px; color: #8a94a6; text-align: center; font-size: 12px; 
 [hidden] { display: none !important; }
 @media (max-width: 420px) { .card { border-radius: 18px; } h1 { font-size: 28px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+
+
+.share-button {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 18px;
+  padding: 10px 16px;
+  border: 1px solid #cfe0f8;
+  border-radius: 12px;
+  color: var(--blue);
+  background: #f4f8ff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.share-button:hover { background: #eaf3ff; }
+.share-button:disabled { opacity: .65; cursor: wait; }
+.share-status { margin: 9px 0 0; text-align: center; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
